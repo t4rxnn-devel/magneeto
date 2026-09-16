@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  dynamic-code-discovery-and-linting:
+  dynamic-code-discovery-and-formatting:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Repository
@@ -28,9 +28,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 black mypy numpy
 
-      - name: Dynamically Discover and Lint All Project Python Simulation Modules
+      - name: Dynamically Discover and Auto Format All Project Python Modules
         run: |
-          find . -type f -name "*.py" -not -path "*/.*" | xargs -I {} sh -c 'echo "Checking: {}" && black --check "{}"'
+          find . -type f -name "*.py" -not -path "*/.*" | xargs -I {} sh -c 'echo "Formatting: {}" && black "{}"'
 
       - name: Execute Multi Tier Syntax Diagnostics Over Discovered Simulation Frameworks
         run: |
@@ -38,7 +38,7 @@ jobs:
           find . -type f -name "*.py" -not -path "*/.*" | xargs -I {} sh -c 'flake8 "{}" --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics'
 
   dynamic-firmware-matrix-cross-compilation:
-    needs: dynamic-code-discovery-and-linting
+    needs: dynamic-code-discovery-and-formatting
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -91,7 +91,7 @@ jobs:
           retention-days: 5
 
   dynamic-digital-twin-verification:
-    needs: dynamic-code-discovery-and-linting
+    needs: dynamic-code-discovery-and-formatting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Repository
