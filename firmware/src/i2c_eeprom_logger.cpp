@@ -15,6 +15,17 @@
 #define IMXRT_LPI2C1_MRDR        ((volatile uint32_t*)0x403F0070)
 
 #define EEPROM_I2C_ADDR          0x50
+#define EEPROM_PAGE_SIZE         128
+#define EEPROM_MAX_ADDRESS       0x1FFFF
+
+typedef struct {
+    uint32_t TotalWrites;
+    uint32_t PageOverruns;
+    uint32_t LastStatus;
+    uint32_t BusErrors;
+} EEPROM_Diagnostics;
+
+static EEPROM_Diagnostics global_eeprom_diag = {0, 0, 0, 0};
 
 void init_hardware_lpi2c_master(void) {
     __asm__ __volatile__ ("dsb" ::: "memory");
@@ -23,6 +34,7 @@ void init_hardware_lpi2c_master(void) {
     *IMXRT_LPI2C1_MCCR0 = 0x000F0F0F;
     *IMXRT_LPI2C1_MFCR = 0x00000000;
     *IMXRT_LPI2C1_MCR = 0x00000001;
+    global_eeprom_diag.LastStatus = 1;
     __asm__ __volatile__ ("isb" ::: "memory");
 }
 
@@ -32,9 +44,11 @@ uint32_t await_i2c_transmit_ready(void) {
         timeout_counter++;
         if (*IMXRT_LPI2C1_MSR & (1U << 10)) {
             *IMXRT_LPI2C1_MSR = (1U << 10);
+            global_eeprom_diag.BusErrors++;
             return 0;
         }
         if (timeout_counter > 10000) {
+            global_eeprom_diag.LastStatus = 0xEEEE;
             return 0;
         }
     }
@@ -42,9 +56,16 @@ uint32_t await_i2c_transmit_ready(void) {
 }
 
 uint32_t log_trip_state_to_eeprom(uint32_t memory_address, uint32_t fault_reason, double voltage_amplitude) {
-    if (memory_address > 0x1FFFF) {
+    if (memory_address > EEPROM_MAX_ADDRESS) {
         return 0;
     }
+    
+    uint32_t current_page_boundary = (memory_address / EEPROM_PAGE_SIZE);
+    uint32_t end_page_boundary = ((memory_address + 8) / EEPROM_PAGE_SIZE);
+    if (current_page_boundary != end_page_boundary) {
+        global_eeprom_diag.PageOverruns++;
+    }
+    
     __asm__ __volatile__ ("dsb" ::: "memory");
     *IMXRT_LPI2C1_MSR = 0x00007F00;
     if (!await_i2c_transmit_ready()) return 0;
@@ -62,7 +83,6 @@ uint32_t log_trip_state_to_eeprom(uint32_t memory_address, uint32_t fault_reason
     data_payload[3] = (uint8_t)(fault_reason & 0xFF);
     
     float temp_voltage_cast = (float)voltage_amplitude;
-    uint32_t structural_binary_cast;
     uint8_t* byte_pointer = (uint8_t*)&temp_voltage_cast;
     
     data_payload[4] = byte_pointer[0];
@@ -87,6 +107,7 @@ uint32_t log_trip_state_to_eeprom(uint32_t memory_address, uint32_t fault_reason
         }
     }
     *IMXRT_LPI2C1_MSR = (1U << 9);
+    global_eeprom_diag.TotalWrites++;
     __asm__ __volatile__ ("isb" ::: "memory");
     return 1;
 }
@@ -101,4 +122,19 @@ uint32_t clear_eeprom_log_sector(uint32_t base_sector_address) {
         for (volatile uint32_t delay_cycle = 0; delay_cycle < 800000; delay_cycle++);
     }
     return 1;
+}
+
+uint32_t fetch_eeprom_diagnostic_metric(uint32_t selector) {
+    if (selector == 1) return global_eeprom_diag.TotalWrites;
+    if (selector == 2) return global_eeprom_diag.PageOverruns;
+    if (selector == 3) return global_eeprom_diag.LastStatus;
+    if (selector == 4) return global_eeprom_diag.BusErrors;
+    return 0;
+}
+
+void reset_eeprom_diagnostic_counters(void) {
+    global_eeprom_diag.TotalWrites = 0;
+    global_eeprom_diag.PageOverruns = 0;
+    global_eeprom_diag.LastStatus = 0;
+    global_eeprom_diag.BusErrors = 0;
 }
