@@ -1,4 +1,4 @@
-name: Production Grade Embedded Hardware and Software Loop Validation Pipeline
+name: Dynamic Production Automation and Multi Architecture Verification Pipeline
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  static-analysis-and-linting:
+  dynamic-code-discovery-and-linting:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Repository
@@ -24,22 +24,22 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install Linting Tools and Quality Checkers
+      - name: Install Code Quality Verification Toolsets
         run: |
           python -m pip install --upgrade pip
           pip install flake8 black mypy numpy
 
-      - name: Execute Python Source Formatting Code Check
+      - name: Dynamically Discover and Lint All Project Python Simulation Modules
         run: |
-          black --check simulation/run_mhd_testbench.py
+          find . -type f -name "*.py" -not -path "*/.*" | xargs -I {} sh -c 'echo "Checking: {}" && black --check "{}"'
 
-      - name: Run Static Analysis Diagnostic Matrix on Simulation Engine
+      - name: Execute Multi Tier Syntax Diagnostics Over Discovered Simulation Frameworks
         run: |
-          flake8 simulation/run_mhd_testbench.py --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 simulation/run_mhd_testbench.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          find . -type f -name "*.py" -not -path "*/.*" | xargs -I {} sh -c 'flake8 "{}" --count --select=E9,F63,F7,F82 --show-source --statistics'
+          find . -type f -name "*.py" -not -path "*/.*" | xargs -I {} sh -c 'flake8 "{}" --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics'
 
-  firmware-cross-compilation:
-    needs: static-analysis-and-linting
+  dynamic-firmware-matrix-cross-compilation:
+    needs: dynamic-code-discovery-and-linting
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -54,35 +54,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
 
-      - name: Create Isolated Structural Output Build Directories
+      - name: Create Isolated Output Architecture Build Infrastructure Directories
         run: |
-          mkdir -p build/firmware/src
-          mkdir -p build/firmware/include
+          mkdir -p build/compiled_objects
+          mkdir -p build/inspection_profiles
           mkdir -p artifacts
 
-      - name: Execute Cross Compilation Optimization Vector Array
+      - name: Dynamically Scan and Cross Compile All Scattered Sources To Static Machine Units
         run: |
-          arm-none-eabi-g++ -c ${{ matrix.optimization-level }} -Wall -Wextra -Werror \
-            -mcpu=${{ matrix.target-arch }} -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard \
-            -ffunction-sections -fdata-sections \
-            -I firmware/include \
-            firmware/src/main.cpp \
-            -o build/main_${{ matrix.optimization-level }}.o
+          find firmware/src -type f \( -name "*.cpp" -o -name "*.c" -o -name "*.S" \) > source_list.txt
+          cat source_list.txt
+          while IFS= read -r src_file; do
+            base_name=$(basename "$src_file" | cut -f 1 -d '.')
+            echo "Compiling structural asset: $src_file"
+            arm-none-eabi-g++ -c ${{ matrix.optimization-level }} -Wall -Wextra -Werror \
+              -mcpu=${{ matrix.target-arch }} -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard \
+              -ffunction-sections -fdata-sections \
+              -I firmware/include \
+              "$src_file" \
+              -o "build/compiled_objects/${base_name}_${{ matrix.optimization-level }}.o"
+          done < source_list.txt
 
-      - name: Generate Deep Inspection Structural Symbolic Disassembly Profiles
+      - name: Generate Deep Inspection Structural Symbolic Disassembly Profiles Over Validated Outputs
         run: |
-          arm-none-eabi-objdump -h -S build/main_${{ matrix.optimization-level }}.o > artifacts/disassembly_${{ matrix.optimization-level }}.txt
-          arm-none-eabi-size build/main_${{ matrix.optimization-level }}.o > artifacts/memory_footprint_${{ matrix.optimization-level }}.txt
+          find build/compiled_objects -type f -name "*.o" > valid_objects.txt
+          while IFS= read -r obj; do
+            base_obj=$(basename "$obj" .o)
+            arm-none-eabi-objdump -h -S "$obj" > "artifacts/disassembly_${base_obj}.txt"
+            arm-none-eabi-size "$obj" > "artifacts/memory_footprint_${base_obj}.txt"
+          done < valid_objects.txt
 
-      - name: Archive Validated Compilation Target Microcontroller Binaries
+      - name: Archive Dynamically Discovered and Compiled Target Microcontroller Object Modules
         uses: actions/upload-artifact@v4
         with:
-          name: MAGNEETO-Compiled-Objects-${{ matrix.optimization-level }}
+          name: MAGNEETO-Dynamic-Objects-${{ matrix.optimization-level }}
           path: artifacts/
           retention-days: 5
 
-  digital-twin-verification:
-    needs: static-analysis-and-linting
+  dynamic-digital-twin-verification:
+    needs: dynamic-code-discovery-and-linting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Repository
@@ -98,28 +108,33 @@ jobs:
           python -m pip install --upgrade pip
           pip install numpy
 
-      - name: Run High Fidelity Magnetohydrodynamic Math Engine Emulation Loop
+      - name: Dynamically Discover and Execute All Analytical Physical Validation Subroutines
         run: |
-          python simulation/run_mhd_testbench.py
+          find simulation -type f -name "*.py" -not -path "*/.*" > run_list.txt
+          cat run_list.txt
+          while IFS= read -r script_file; do
+            echo "Executing algorithmic verification matrix suite: $script_file"
+            python "$script_file"
+          done < run_list.txt
 
-      - name: Validate Calculation Matrix Performance Metrics
+      - name: System Environment Sanity Attestation Check
         run: |
           python -c "
           import sys
           try:
               import numpy
-              print('Simulation environment verification check passed.')
+              print('Dynamic simulation runtime allocation completed verified.')
           except ImportError:
               sys.exit(1)
           "
 
   pipeline-deployment-gate:
-    needs: [firmware-cross-compilation, digital-twin-verification]
+    needs: [dynamic-firmware-matrix-cross-compilation, dynamic-digital-twin-verification]
     runs-on: ubuntu-latest
     steps:
       - name: Emit Success Telemetry Validation Handshake
         run: |
           echo "=========================================================="
-          echo "  MAGNEETO PIPELINE INTEGRITY: ALL TESTS COMPLETED SUCCESSFULLY"
-          echo "  EMBEDDED CODES SECURED | NUMERICAL MATH LOOPS ACCREDITED  "
+          echo "  MAGNEETO DYNAMIC WORKFLOW SECURED: SYSTEM FULLY STABLE  "
+          echo "  ALL HISTORICAL AND NEW ARCHIVE MODULES AUTO RECOGNIZED  "
           echo "=========================================================="
