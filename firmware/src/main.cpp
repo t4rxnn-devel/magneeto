@@ -28,7 +28,8 @@ void lock_system_into_safe_shutdown(uint32_t reason_code) {
     global_hardware_interrupt_disable();
     emergency_shutoff_actuators();
     while (1) {
-        *IMXRT_PWM_GATE_DRIVER = reason_code;
+        volatile uint32_t safety_sink = reason_code;
+        (void)safety_sink;
         refresh_hardware_watchdog();
     }
 }
