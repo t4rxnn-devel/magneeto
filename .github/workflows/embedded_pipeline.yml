@@ -1,0 +1,28 @@
+name: Embedded Production Compilation Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-firmware:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository Source
+      uses: actions/checkout@v4
+
+    - name: Install Embedded ARM GCC Toolchain
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
+
+    - name: Compile Bare-Metal Main Object Binary
+      run: |
+        mkdir -p build
+        arm-none-eabi-g++ -c -O3 -Wall -mcpu=cortex-m7 -mthumb -ffunction-sections -fdata-sections firmware/src/main.cpp -o build/main.o
+
+    - name: Verify Architectural Output File
+      run: |
+        test -f build/main.o && echo "Compilation successful" || exit 1
